@@ -8,28 +8,28 @@ pin: true
 render_with_liquid: false
 ---
 
-Once I worked on service that allow customers deploy their profiles (configuration for company healthcare server) in cloud. \
+Once I worked on service that allow customers deploy their profiles (configuration for company healthcare server) in the cloud. \
 Clients created environment and will be able to configure number `instances`, their `RAM`, `CPU` and so on.\
 In backend actually every environment was a `EKS` cluster with `ingress`, `node/pod autoscaler`, `calico` and other fancy things.\
-And as clients may rescale their environment at runtime (and of course they don't want to know what is behind that) , we should be able to resize cluster flawlessly.\
+And as clients may rescale their environment at runtime (and of course they don't want to know what is behind that), we should be able to resize cluster flawlessly.\
 Therefore, I had a task to automate migration all deployments to different `Node Group` without downtime and packet drops.
 
-> Service was in `Java/Spring`, so `Java AWS SDK V2` was used (but it doesn't matter actually).
+> Service was in `Java/Spring`, so `Java AWS SDK V2` was used (but it doesn't matter).
 {: .prompt-tip }
 
 ## Prerequisites
 
-We find-out that most of the clients used only 1-2 instances (`pods`) for their workload. \
-Probably not what for kubernetes was created. \
-And with that small numbers while updating/migrating pods, we very easily caught packet drops. \
+We find-out that most of the clients used only 1–2 instances (`pods`) for their workload. \
+Probably not what for kubernetes was created? \
+And with that small number while updating/migrating pods, we very easily caught packet drops. \
 Why? \
 We from our service can't control what actually was deployed. We can't tell deployed profile `close your connection`. We still can stop profile (and pod) of course. \
 And we can't control `Load Balancer` either (we used `Network Load Balancer`). \
-So the main strategy for "No packed drops" for deployment configuration is big `termination grace period`. Bigger than any open connection can last for specific pod.
+So the main strategy for "No packed drops" for deployment configuration is big `termination grace period`. Bigger than any open connection can last for a specific pod.
 
 ## Steps
 
-Let's go step by step how to accomplish this.
+Let's go step by step how to achieve this.
 
 ### 1. Create Node Group
 
@@ -87,13 +87,13 @@ and code for Launch Template (`ec2Service.createLaunchTemplate`):
             return ec2.createLaunchTemplate(request).launchTemplate();
 ```
 
-> At the time when I was worked on that, Java SDK has a bug (or feature?) - \
-> It didn't allow to create node-group without launch template.\
-> You should have created empty template even if you didn't need template customization.\
+> At the time when I was worked on that, Java SDK has a bug (or feature?)—\
+> It didn't allow creating a node-group without launching template.\
+> You should have created an empty template even if you didn't need template customization.\
 > Probably it was fixed already.
 {: .prompt-warning }
 
-For manual creation using CLI you can refer [AWS docs](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html).
+For manual creation using CLI, you can refer [to AWS docs](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html).
 
 Basically, you need to fill the [Front Matter](https://jekyllrb.com/docs/front-matter/) as below at the top of the post:
 
