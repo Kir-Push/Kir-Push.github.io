@@ -95,25 +95,22 @@ and code for Launch Template (`ec2Service.createLaunchTemplate`):
 
 For manual creation using CLI, you can refer [to AWS docs](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html).
 
-Basically, you need to fill the [Front Matter](https://jekyllrb.com/docs/front-matter/) as below at the top of the post:
 
-```yaml
----
-title: TITLE
-date: YYYY-MM-DD HH:MM:SS +/-TTTT
-categories: [TOP_CATEGORIE, SUB_CATEGORIE]
-tags: [TAG]     # TAG names should always be lowercase
----
-```
+### 2. Tagging the old Node Group
 
-> The posts' _layout_ has been set to `post` by default, so there is no need to add the variable _layout_ in the Front Matter block.
-{: .prompt-tip }
-
-### Timezone of Date
+#### 2.1 Froze Node Autoscaler
 
 To accurately record the release date of a post, you should not only set up the `timezone` of `_config.yml`{: .filepath} but also provide the post's timezone in variable `date` of its Front Matter block. Format: `+/-TTTT`, e.g. `+0800`.
 
-### Categories and Tags
+### 3. Scaling deployments
+
+#### 3.1 Tagging deployments
+
+#### 3.2 Froze Pod Autoscaler
+
+#### 3.3 Scale service deployments
+
+#### 3.4 Scale user deployments
 
 The `categories` of each post are designed to contain up to two elements, and the number of elements in `tags` can be zero to infinity. For instance:
 
@@ -124,7 +121,7 @@ tags: [bee]
 ---
 ```
 
-### Author Information
+### 4. Tagging the old Node Group again
 
 The author information of the post usually does not need to be filled in the _Front Matter_ , they will be obtained from variables `social.name` and the first entry of `social.links` of the configuration file by default. But you can also override it as follows:
 
@@ -153,7 +150,9 @@ Having said that, the key `author` can also identify multiple entries.
 > The benefit of reading the author information from the file `_data/authors.yml`{: .filepath } is that the page will have the meta tag `twitter:creator`, which enriches the [Twitter Cards](https://developer.twitter.com/en/docs/twitter-for-websites/cards/guides/getting-started#card-and-content-attribution) and is good for SEO.
 {: .prompt-info }
 
-### Post Description
+### 5. Deleting the old Node Group
+
+
 
 By default, the first words of the post are used to display on the home page for a list of posts, in the _Further Reading_ section, and in the XML of the RSS feed. If you don't want to display the auto-generated description for the post, you can customize it using the `description` field in the _Front Matter_ as follows:
 
@@ -165,7 +164,18 @@ description: Short summary of the post.
 
 Additionally, the `description` text will also be displayed under the post title on the post's page.
 
-## Table of Contents
+### 6. Descaling Deployments
+
+#### 6.1 Descale user deployments
+
+#### 6.2 Descale service deployments
+
+#### 6.3 Untagging deployments
+
+#### 6.4 Unfroze Pod Autoscaler
+
+#### 6.5 Unfroze Node Autoscaler
+
 
 By default, the **T**able **o**f **C**ontents (TOC) is displayed on the right panel of the post. If you want to turn it off globally, go to `_config.yml`{: .filepath} and set the value of variable `toc` to `false`. If you want to turn off TOC for a specific post, add the following to the post's [Front Matter](https://jekyllrb.com/docs/front-matter/):
 
@@ -175,7 +185,7 @@ toc: false
 ---
 ```
 
-## Comments
+### Summary
 
 The global switch of comments is defined by variable `comments.active` in the file `_config.yml`{: .filepath}. After selecting a comment system for this variable, comments will be turned on for all posts.
 
