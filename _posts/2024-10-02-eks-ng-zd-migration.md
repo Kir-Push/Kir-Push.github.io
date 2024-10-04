@@ -1,5 +1,5 @@
 ---
-title: AWS EKS zero-downtime Node Group migration (and cluster upgrade)
+title: AWS EKS zero-downtime Node Group migration
 author: kirka
 date: 2024-10-02 21:10:00 +0800
 categories: [Software, Tutorial]
@@ -98,498 +98,107 @@ For manual creation using CLI, you can refer [to AWS docs](https://docs.aws.amaz
 
 ### 2. Tagging the old Node Group
 
-#### 2.1 Froze Node Autoscaler
+#### 2.1 No Schedule Taint
 
-To accurately record the release date of a post, you should not only set up the `timezone` of `_config.yml`{: .filepath} but also provide the post's timezone in variable `date` of its Front Matter block. Format: `+/-TTTT`, e.g. `+0800`.
+The next step is tagging your existing Node Group for stopping scheduling new pods on this group.\
+Kubernetes has special taint (mark for nodes) for that - `No Schedule`.\
+You can read about taints in kubernetes [docs](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
+
+
+#### 2.2 Froze Node Autoscaler
+
+Another thing that you better do —froze your Node Autoscaler.\
+It's not necessary but will eliminate any possibility of accidental node resizing.\
+In time when your current node group is tainted but a new node group doesn't have enough nodes due to resizing—you may find in situation when next steps will be in an uncertain state.\
+Simplest frozen algorithm—just set Node Autoscaler min and max node size property to the current nodes count.\
+You can add annotation to Autoscaler to remember the previous state.
 
 ### 3. Scaling deployments
 
+Now you should do actual migration.\
+How to migrate deployments?\
+Just scale them and due to old Node Group tainted as `No Schedule`, new pods will be created on new group.\
+Simple as that.\
+Almost.
+
 #### 3.1 Tagging deployments
+
+To simplify your life, remember to annotate deployment with their current state (number of pods). \
+Will be handily on at the end of migration.
 
 #### 3.2 Froze Pod Autoscaler
 
+If you have Pod Autoscaler - do the same as you do with [Node Autoscaler](#22-froze-node-autoscaler).
+
+
 #### 3.3 Scale service deployments
+
+Next I would recommend scaling your service deployments(coreDns, Autoscaler),\
+just to prevent race condition between deployments in rare case when your new node group doesn't have enough space.
 
 #### 3.4 Scale user deployments
 
-The `categories` of each post are designed to contain up to two elements, and the number of elements in `tags` can be zero to infinity. For instance:
-
-```yaml
----
-categories: [Animal, Insect]
-tags: [bee]
----
-```
+And finally, scale your actual deployments.
+It's better to scale to x2 of initial size—just to have an exact copy of state after migration.
 
 ### 4. Tagging the old Node Group again
 
-The author information of the post usually does not need to be filled in the _Front Matter_ , they will be obtained from variables `social.name` and the first entry of `social.links` of the configuration file by default. But you can also override it as follows:
+When deployments are scaled and ready (when ready!) proceed to exclusion old nodes from traffic. \
+We need to exclude a node group from Load Balancer for clean old deployment from receiving traffic. \
+Kubernetes has a label for that - `http://node.kubernetes.io/exclude-from-external-load-balancers`. Refer to [docs](https://kubernetes.io/docs/reference/labels-annotations-taints/) as usual.\
+Please note - if your LB service `externalTrafficPolicy` property set to `local` - you are fine.\
+But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worht doing).
 
-Adding author information in `_data/authors.yml` (If your website doesn't have this file, don't hesitate to create one).
-
-```yaml
-<author_id>:
-  name: <full name>
-  twitter: <twitter_of_author>
-  url: <homepage_of_author>
-```
-{: file="_data/authors.yml" }
-
-And then use `author` to specify a single entry or `authors` to specify multiple entries:
-
-```yaml
----
-author: <author_id>                     # for single entry
-# or
-authors: [<author1_id>, <author2_id>]   # for multiple entries
----
-```
-
-Having said that, the key `author` can also identify multiple entries.
-
-> The benefit of reading the author information from the file `_data/authors.yml`{: .filepath } is that the page will have the meta tag `twitter:creator`, which enriches the [Twitter Cards](https://developer.twitter.com/en/docs/twitter-for-websites/cards/guides/getting-started#card-and-content-attribution) and is good for SEO.
-{: .prompt-info }
-
+ 
 ### 5. Deleting the old Node Group
 
-
-
-By default, the first words of the post are used to display on the home page for a list of posts, in the _Further Reading_ section, and in the XML of the RSS feed. If you don't want to display the auto-generated description for the post, you can customize it using the `description` field in the _Front Matter_ as follows:
-
-```yaml
----
-description: Short summary of the post.
----
-```
-
-Additionally, the `description` text will also be displayed under the post title on the post's page.
+When you waited some time, and you are sure that nodes are excluded from Load Balancer - you can delete them.\
+How to know depends on your LB configuration.
+But if you know your Load Balancer `idle connection timeout` - wait at least few sec more than that value.
+After that, drop Node Group.
+\
+EKS will evict Node Group and will respect `terminationGracePeriodSeconds` of your pods deployments.
 
 ### 6. Descaling Deployments
 
+And right after delete Node Group - descale your Deployments.\
+Often I saw when people recommend first descaling and delete Node Group after.\, 
+But I encounter strange behavior which I didn't expected.\
+When descaling by scale of 2 as example -
+kubernetes (at least versions <= 1.27, but I'm pretty sure it's actual in 1.30)
+may descale pods from old and new Node Group randomly.
+Even if Node Group marked as `No Schedule`.\
+Not good, approach "Delete and descale after" also risky—you would have better to do it fast.
+Don't wait after deletion Node Group.\
+Who knows what happens?\
+When you delete first - EKS won't descale pods from the new Node Group.
+It will drop already draining pods from old one.\
+Another drawback - it might schedule them in a new Node Group before you descale.\
+So think what approach suits for you.
+
 #### 6.1 Descale user deployments
+
+Let's pretend that you do as I said above.\
+Descale your deployments to the initial state.
 
 #### 6.2 Descale service deployments
 
+Descale your service deployments to the initial state.
+
 #### 6.3 Untagging deployments
+
+Untag deployments—remove annotations that you put in them in [previous steps](#31-tagging-deployments).
 
 #### 6.4 Unfroze Pod Autoscaler
 
+Restore state of Pod Autoscaler.
+
 #### 6.5 Unfroze Node Autoscaler
 
-
-By default, the **T**able **o**f **C**ontents (TOC) is displayed on the right panel of the post. If you want to turn it off globally, go to `_config.yml`{: .filepath} and set the value of variable `toc` to `false`. If you want to turn off TOC for a specific post, add the following to the post's [Front Matter](https://jekyllrb.com/docs/front-matter/):
-
-```yaml
----
-toc: false
----
-```
+And restore state of Node Autoscaler.
 
 ### Summary
 
-The global switch of comments is defined by variable `comments.active` in the file `_config.yml`{: .filepath}. After selecting a comment system for this variable, comments will be turned on for all posts.
-
-If you want to close the comment for a specific post, add the following to the **Front Matter** of the post:
-
-```yaml
----
-comments: false
----
-```
-
-## Media
-
-We refer to images, audio and video as media resources in _Chirpy_.
-
-### URL Prefix
-
-From time to time we have to define duplicate URL prefixes for multiple resources in a post, which is a boring task that you can avoid by setting two parameters.
-
-- If you are using a CDN to host media files, you can specify the `cdn` in `_config.yml`{: .filepath }. The URLs of media resources for site avatar and posts are then prefixed with the CDN domain name.
-
-  ```yaml
-  cdn: https://cdn.com
-  ```
-  {: file='_config.yml' .nolineno }
-
-- To specify the resource path prefix for the current post/page range, set `media_subpath` in the _front matter_ of the post:
-
-  ```yaml
-  ---
-  media_subpath: /path/to/media/
-  ---
-  ```
-  {: .nolineno }
-
-The option `site.cdn` and `page.media_subpath` can be used individually or in combination to flexibly compose the final resource URL: `[site.cdn/][page.media_subpath/]file.ext`
-
-### Images
-
-#### Caption
-
-Add italics to the next line of an image, then it will become the caption and appear at the bottom of the image:
-
-```markdown
-![img-description](/path/to/image)
-_Image Caption_
-```
-{: .nolineno}
-
-#### Size
-
-To prevent the page content layout from shifting when the image is loaded, we should set the width and height for each image.
-
-```markdown
-![Desktop View](/assets/img/sample/mockup.png){: width="700" height="400" }
-```
-{: .nolineno}
-
-> For an SVG, you have to at least specify its _width_, otherwise it won't be rendered.
-{: .prompt-info }
-
-Starting from _Chirpy v5.0.0_, `height` and `width` support abbreviations (`height` → `h`, `width` → `w`). The following example has the same effect as the above:
-
-```markdown
-![Desktop View](/assets/img/sample/mockup.png){: w="700" h="400" }
-```
-{: .nolineno}
-
-#### Position
-
-By default, the image is centered, but you can specify the position by using one of the classes `normal`, `left`, and `right`.
-
-> Once the position is specified, the image caption should not be added.
-{: .prompt-warning }
-
-- **Normal position**
-
-  Image will be left aligned in below sample:
-
-  ```markdown
-  ![Desktop View](/assets/img/sample/mockup.png){: .normal }
-  ```
-  {: .nolineno}
-
-- **Float to the left**
-
-  ```markdown
-  ![Desktop View](/assets/img/sample/mockup.png){: .left }
-  ```
-  {: .nolineno}
-
-- **Float to the right**
-
-  ```markdown
-  ![Desktop View](/assets/img/sample/mockup.png){: .right }
-  ```
-  {: .nolineno}
-
-#### Dark/Light mode
-
-You can make images follow theme preferences in dark/light mode. This requires you to prepare two images, one for dark mode and one for light mode, and then assign them a specific class (`dark` or `light`):
-
-```markdown
-![Light mode only](/path/to/light-mode.png){: .light }
-![Dark mode only](/path/to/dark-mode.png){: .dark }
-```
-
-#### Shadow
-
-The screenshots of the program window can be considered to show the shadow effect:
-
-```markdown
-![Desktop View](/assets/img/sample/mockup.png){: .shadow }
-```
-{: .nolineno}
-
-#### Preview Image
-
-If you want to add an image at the top of the post, please provide an image with a resolution of `1200 x 630`. Please note that if the image aspect ratio does not meet `1.91 : 1`, the image will be scaled and cropped.
-
-Knowing these prerequisites, you can start setting the image's attribute:
-
-```yaml
----
-image:
-  path: /path/to/image
-  alt: image alternative text
----
-```
-
-Note that the [`media_subpath`](#url-prefix) can also be passed to the preview image, that is, when it has been set, the attribute `path` only needs the image file name.
-
-For simple use, you can also just use `image` to define the path.
-
-```yml
----
-image: /path/to/image
----
-```
-
-#### LQIP
-
-For preview images:
-
-```yaml
----
-image:
-  lqip: /path/to/lqip-file # or base64 URI
----
-```
-
-[//]: # (> You can observe LQIP in the preview image of post \"[Text and Typography]&#40;../text-and-typography/&#41;\".)
-
-For normal images:
-
-```markdown
-![Image description](/path/to/image){: lqip="/path/to/lqip-file" }
-```
-{: .nolineno }
-
-### Video
-
-#### Social Media Platform
-
-You can embed videos from social media platforms with the following syntax:
-
-```liquid
-{% include embed/{Platform}.html id='{ID}' %}
-```
-
-Where `Platform` is the lowercase of the platform name, and `ID` is the video ID.
-
-The following table shows how to get the two parameters we need in a given video URL, and you can also know the currently supported video platforms.
-
-| Video URL                                                                                          | Platform   | ID             |
-| -------------------------------------------------------------------------------------------------- | ---------- | :------------- |
-| [https://www.**youtube**.com/watch?v=**H-B46URT4mg**](https://www.youtube.com/watch?v=H-B46URT4mg) | `youtube`  | `H-B46URT4mg`  |
-| [https://www.**twitch**.tv/videos/**1634779211**](https://www.twitch.tv/videos/1634779211)         | `twitch`   | `1634779211`   |
-| [https://www.**bilibili**.com/video/**BV1Q44y1B7Wf**](https://www.bilibili.com/video/BV1Q44y1B7Wf) | `bilibili` | `BV1Q44y1B7Wf` |
-
-#### Video Files
-
-If you want to embed a video file directly, use the following syntax:
-
-```liquid
-{% include embed/video.html src='{URL}' %}
-```
-
-Where `URL` is a URL to a video file e.g. `/path/to/sample/video.mp4`.
-
-You can also specify additional attributes for the embedded video file. Here is a full list of attributes allowed.
-
-- `poster='/path/to/poster.png'` — poster image for a video that is shown while video is downloading
-- `title='Text'` — title for a video that appears below the video and looks same as for images
-- `autoplay=true` — video automatically begins to play back as soon as it can
-- `loop=true` — automatically seek back to the start upon reaching the end of the video
-- `muted=true` — audio will be initially silenced
-- `types` — specify the extensions of additional video formats separated by `|`. Ensure these files exist in the same directory as your primary video file.
-
-Consider an example using all of the above:
-
-```liquid
-{%
-  include embed/video.html
-  src='/path/to/video.mp4'
-  types='ogg|mov'
-  poster='poster.png'
-  title='Demo video'
-  autoplay=true
-  loop=true
-  muted=true
-%}
-```
-
-### Audios
-
-If you want to embed an audio file directly, use the following syntax:
-
-```liquid
-{% include embed/audio.html src='{URL}' %}
-```
-
-Where `URL` is a URL to an audio file e.g. `/path/to/audio.mp3`.
-
-You can also specify additional attributes for the embedded audio file. Here is a full list of attributes allowed.
-
-- `title='Text'` — title for an audio that appears below the audio and looks same as for images
-- `types` — specify the extensions of additional audio formats separated by `|`. Ensure these files exist in the same directory as your primary audio file.
-
-Consider an example using all of the above:
-
-```liquid
-{%
-  include embed/audio.html
-  src='/path/to/audio.mp3'
-  types='ogg|wav|aac'
-  title='Demo audio'
-%}
-```
-
-## Pinned Posts
-
-You can pin one or more posts to the top of the home page, and the fixed posts are sorted in reverse order according to their release date. Enable by:
-
-```yaml
----
-pin: true
----
-```
-
-## Prompts
-
-There are several types of prompts: `tip`, `info`, `warning`, and `danger`. They can be generated by adding the class `prompt-{type}` to the blockquote. For example, define a prompt of type `info` as follows:
-
-```md
-> Example line for prompt.
-{: .prompt-info }
-```
-{: .nolineno }
-
-## Syntax
-
-### Inline Code
-
-```md
-`inline code part`
-```
-{: .nolineno }
-
-### Filepath Highlight
-
-```md
-`/path/to/a/file.extend`{: .filepath}
-```
-{: .nolineno }
-
-### Code Block
-
-Markdown symbols ```` ``` ```` can easily create a code block as follows:
-
-````md
-```
-This is a plaintext code snippet.
-```
-````
-
-#### Specifying Language
-
-Using ```` ```{language} ```` you will get a code block with syntax highlight:
-
-````markdown
-```yaml
-key: value
-```
-````
-
-> The Jekyll tag `{% highlight %}` is not compatible with this theme.
-{: .prompt-danger }
-
-#### Line Number
-
-By default, all languages except `plaintext`, `console`, and `terminal` will display line numbers. When you want to hide the line number of a code block, add the class `nolineno` to it:
-
-````markdown
-```shell
-echo 'No more line numbers!'
-```
-{: .nolineno }
-````
-
-#### Specifying the Filename
-
-You may have noticed that the code language will be displayed at the top of the code block. If you want to replace it with the file name, you can add the attribute `file` to achieve this:
-
-````markdown
-```shell
-# content
-```
-{: file="path/to/file" }
-````
-
-#### Liquid Codes
-
-If you want to display the **Liquid** snippet, surround the liquid code with `{% raw %}` and `{% endraw %}`:
-
-````markdown
-{% raw %}
-```liquid
-{% if product.title contains 'Pack' %}
-  This product's title contains the word Pack.
-{% endif %}
-```
-{% endraw %}
-````
-
-Or adding `render_with_liquid: false` (Requires Jekyll 4.0 or higher) to the post's YAML block.
-
-## Mathematics
-
-We use [**MathJax**][mathjax] to generate mathematics. For website performance reasons, the mathematical feature won't be loaded by default. But it can be enabled by:
-
-[mathjax]: https://www.mathjax.org/
-
-```yaml
----
-math: true
----
-```
-
-After enabling the mathematical feature, you can add math equations with the following syntax:
-
-- **Block math** should be added with `$$ math $$` with **mandatory** blank lines before and after `$$`
-  - **Inserting equation numbering** should be added with `$$\begin{equation} math \end{equation}$$`
-  - **Referencing equation numbering** should be done with `\label{eq:label_name}` in the equation block and `\eqref{eq:label_name}` inline with text (see example below)
-- **Inline math** (in lines) should be added with `$$ math $$` without any blank line before or after `$$`
-- **Inline math** (in lists) should be added with `\$$ math $$`
-
-```markdown
-<!-- Block math, keep all blank lines -->
-
-$$
-LaTeX_math_expression
-$$
-
-<!-- Equation numbering, keep all blank lines  -->
-
-$$
-\begin{equation}
-  LaTeX_math_expression
-  \label{eq:label_name}
-\end{equation}
-$$
-
-Can be referenced as \eqref{eq:label_name}.
-
-<!-- Inline math in lines, NO blank lines -->
-
-"Lorem ipsum dolor sit amet, $$ LaTeX_math_expression $$ consectetur adipiscing elit."
-
-<!-- Inline math in lists, escape the first `$` -->
-
-1. \$$ LaTeX_math_expression $$
-2. \$$ LaTeX_math_expression $$
-3. \$$ LaTeX_math_expression $$
-```
-
-> Starting with `v7.0.0`, configuration options for **MathJax** have been moved to file `assets/js/data/mathjax.js`{: .filepath }, and you can change the options as needed, such as adding [extensions][mathjax-exts].  
-> If you are building the site via `chirpy-starter`, copy that file from the gem installation directory (check with command `bundle info --path jekyll-theme-chirpy`) to the same directory in your repository.
-{: .prompt-tip }
-
-[mathjax-exts]: https://docs.mathjax.org/en/latest/input/tex/extensions/index.html
-
-## Mermaid
-
-[**Mermaid**](https://github.com/mermaid-js/mermaid) is a great diagram generation tool. To enable it on your post, add the following to the YAML block:
-
-```yaml
----
-mermaid: true
----
-```
-
-Then you can use it like other markdown languages: surround the graph code with ```` ```mermaid ```` and ```` ``` ````.
-
-## Learn More
-
-For more knowledge about Jekyll posts, visit the [Jekyll Docs: Posts](https://jekyllrb.com/docs/posts/).
+It's all.\
+I hope this helps someone.
+Despite there a lot of tutorials in web.
