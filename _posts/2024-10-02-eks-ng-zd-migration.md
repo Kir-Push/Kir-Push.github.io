@@ -109,7 +109,7 @@ You can read about taints in kubernetes [docs](https://kubernetes.io/docs/concep
 
 Another thing that you better do —froze your Node Autoscaler.\
 It's not necessary but will eliminate any possibility of accidental node resizing.\
-In time when your current node group is tainted but a new node group doesn't have enough nodes due to resizing—you may find in situation when next steps will be in an uncertain state.\
+In time when your current node group is tainted but a new node group doesn't have enough nodes due to resizing—you may find in a situation when next steps will be in an uncertain state.\
 Simplest frozen algorithm—just set Node Autoscaler min and max node size property to the current nodes count.\
 You can add annotation to Autoscaler to remember the previous state.
 
@@ -172,8 +172,8 @@ Not good, approach "Delete and descale after" also risky—you would have better
 Don't wait after deletion Node Group.\
 Who knows what happens?\
 When you delete first - EKS won't descale pods from the new Node Group.
-It will drop already draining pods from old one.\
-Another drawback - it might schedule them in a new Node Group before you descale.\
+It will drop already draining pods from the old one.\ 
+Another drawback—it might schedule them in a new Node Group before you descale.\
 So think what approach suits for you.
 
 #### 6.1 Descale user deployments
