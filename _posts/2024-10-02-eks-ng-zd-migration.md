@@ -8,7 +8,7 @@ pin: true
 render_with_liquid: false
 ---
 
-Once I worked on service that allow customers deploy their profiles (configuration for company healthcare server) in the cloud. \
+Once I worked on service that allow customers to deploy their profiles (configuration for company healthcare server) in the cloud. \
 Clients created environment and will be able to configure number `instances`, their `RAM`, `CPU` and so on.\
 In backend actually every environment was a `EKS` cluster with `ingress`, `node/pod autoscaler`, `calico` and other fancy things.\
 And as clients may rescale their environment at runtime (and of course they don't want to know what is behind that), we should be able to resize cluster flawlessly.\
@@ -109,7 +109,7 @@ You can read about taints in kubernetes [docs](https://kubernetes.io/docs/concep
 
 Another thing that you better do —froze your Node Autoscaler.\
 It's not necessary but will eliminate any possibility of accidental node resizing.\
-In time when your current node group is tainted but a new node group doesn't have enough nodes due to resizing—you may find in a situation when next steps will be in an uncertain state.\
+In time when your current node group is tainted but a new node group doesn't have enough nodes due to resizing\—you may find in a situation when next steps will be in an uncertain state.\
 Simplest frozen algorithm—just set Node Autoscaler min and max node size property to the current nodes count.\
 You can add annotation to Autoscaler to remember the previous state.
 
@@ -147,7 +147,7 @@ When deployments are scaled and ready (when ready!) proceed to exclusion old nod
 We need to exclude a node group from Load Balancer for clean old deployment from receiving traffic. \
 Kubernetes has a label for that - `http://node.kubernetes.io/exclude-from-external-load-balancers`. Refer to [docs](https://kubernetes.io/docs/reference/labels-annotations-taints/) as usual.\
 Please note - if your LB service `externalTrafficPolicy` property set to `local` - you are fine.\
-But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worht doing).
+But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worth doing).
 
  
 ### 5. Deleting the old Node Group
