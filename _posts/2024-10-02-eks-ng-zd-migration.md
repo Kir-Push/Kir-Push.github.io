@@ -146,8 +146,10 @@ It's better to scale to x2 of initial size—just to have an exact copy of state
 When deployments are scaled and ready (when ready!) proceed to exclusion old nodes from traffic. \
 We need to exclude a node group from Load Balancer for clean old deployment from receiving traffic. \
 Kubernetes has a label for that - `http://node.kubernetes.io/exclude-from-external-load-balancers`. Refer to [docs](https://kubernetes.io/docs/reference/labels-annotations-taints/) as usual.\
-Please note - if your LB service `externalTrafficPolicy` property set to `local` - you are fine.\
-But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worth doing).
+
+> Please note - if your LB service `externalTrafficPolicy` property set to `local` - you are fine.\
+> But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worth doing).
+{: .prompt-warning }
 
  
 ### 5. Deleting the old Node Group
