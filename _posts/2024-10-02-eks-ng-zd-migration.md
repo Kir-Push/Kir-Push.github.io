@@ -8,14 +8,17 @@ pin: true
 render_with_liquid: false
 ---
 
-Once I worked on service that allow customers to deploy their profiles (configuration for company healthcare server) in the cloud. \
+Once I worked on a service that allows customers to deploy their profiles
+(configuration for company healthcare server) in the cloud.
+\
 Clients created environment and will be able to configure number `instances`, their `RAM`, `CPU` and so on.\
 In backend actually every environment was a `EKS` cluster with `ingress`, `node/pod autoscaler`, `calico` and other fancy things.\
-And as clients may rescale their environment at runtime (and of course they don't want to know what is behind that), we should be able to resize cluster flawlessly.\
+And as clients may rescale their environment at runtime (and of course they don’t want to know what is behind that), we
+should be able to resize cluster flawlessly.\
 Therefore, I had a task to automate migration all deployments to different `Node Group` without downtime and packet drops.
 
-> Service was in `Java/Spring`, so `Java AWS SDK V2` was used (but it doesn't matter).
-{: .prompt-tip }
+> Service was in `Java/Spring`, so `Java AWS SDK V2` was used (but it doesn’t matter).
+> {: .prompt-tip }
 
 ## Prerequisites
 
@@ -23,13 +26,14 @@ We find-out that most of the clients used only 1–2 instances (`pods`) for thei
 Probably not what for kubernetes was created? \
 And with that small number while updating/migrating pods, we very easily caught packet drops. \
 Why? \
-We from our service can't control what actually was deployed. We can't tell deployed profile `close your connection`. We still can stop profile (and pod) of course. \
-And we can't control `Load Balancer` either (we used `Network Load Balancer`). \
+We from our service can’t control what actually was deployed. We can't tell deployed profile `close your connection`. We
+still can stop profile (and pod) of course. \
+And we can’t control `Load Balancer` either (we used `Network Load Balancer`). \
 So the main strategy for "No packed drops" for deployment configuration is big `termination grace period`. Bigger than any open connection can last for a specific pod.
 
 ## Steps
 
-Let's go step by step how to achieve this.
+Let’s go step by step how to achieve this.
 
 ### 1. Create Node Group
 
@@ -88,10 +92,10 @@ and code for Launch Template (`ec2Service.createLaunchTemplate`):
 ```
 
 > At the time when I was worked on that, Java SDK has a bug (or feature?)—\
-> It didn't allow creating a node-group without launching template.\
+> It didn’t allow creating a node-group without launching template.\
 > You should have created an empty template even if you didn't need template customization.\
 > Probably it was fixed already.
-{: .prompt-warning }
+> {: .prompt-warning }
 
 For manual creation using CLI, you can refer [to AWS docs](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html).
 
@@ -108,8 +112,10 @@ You can read about taints in kubernetes [docs](https://kubernetes.io/docs/concep
 #### 2.2 Froze Node Autoscaler
 
 Another thing that you better do —froze your Node Autoscaler.\
-It's not necessary but will eliminate any possibility of accidental node resizing.\
-In time when your current node group is tainted but a new node group doesn't have enough nodes due to resizing\—you may find in a situation when next steps will be in an uncertain state.\
+It’s not necessary but will eliminate any possibility of accidental node resizing.\
+In time when your current node group is tainted,
+but a new node group doesn’t have enough nodes due to resizing,\
+you may find in a situation when next steps will be in an uncertain state.\
 Simplest frozen algorithm—just set Node Autoscaler min and max node size property to the current nodes count.\
 You can add annotation to Autoscaler to remember the previous state.
 
@@ -117,7 +123,7 @@ You can add annotation to Autoscaler to remember the previous state.
 
 Now you should do actual migration.\
 How to migrate deployments?\
-Just scale them and due to old Node Group tainted as `No Schedule`, new pods will be created on new group.\
+Scale them and due to old Node Group tainted as `No Schedule`, new pods will be created on new group.\
 Simple as that.\
 Almost.
 
@@ -128,13 +134,13 @@ Will be handily on at the end of migration.
 
 #### 3.2 Froze Pod Autoscaler
 
-If you have Pod Autoscaler - do the same as you do with [Node Autoscaler](#22-froze-node-autoscaler).
+If you have Pod Autoscaler—do the same as you do with [Node Autoscaler](#22-froze-node-autoscaler).
 
 
 #### 3.3 Scale service deployments
 
 Next I would recommend scaling your service deployments(coreDns, Autoscaler),\
-just to prevent race condition between deployments in rare case when your new node group doesn't have enough space.
+just to prevent race condition between deployments in rare case when your new node group doesn’t have enough space.
 
 #### 3.4 Scale user deployments
 
@@ -145,42 +151,42 @@ It's better to scale to x2 of initial size—just to have an exact copy of state
 
 When deployments are scaled and ready (when ready!) proceed to exclusion old nodes from traffic. \
 We need to exclude a node group from Load Balancer for clean old deployment from receiving traffic. \
-Kubernetes has a label for that - `http://node.kubernetes.io/exclude-from-external-load-balancers`. Refer to [docs](https://kubernetes.io/docs/reference/labels-annotations-taints/) as usual.\
+Kubernetes has a label for that - `http://node.kubernetes.io/exclude-from-external-load-balancers`. \
+Refer to [docs](https://kubernetes.io/docs/reference/labels-annotations-taints/) as usual.
 
-> Please note - if your LB service `externalTrafficPolicy` property set to `local` - you are fine.\
+> Please note - if your LB service `externalTrafficPolicy` property set to `local` - you’re fine.\
 > But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worth doing).
-{: .prompt-warning }
+> {: .prompt-warning }
 
  
 ### 5. Deleting the old Node Group
 
-When you waited some time, and you are sure that nodes are excluded from Load Balancer - you can delete them.\
+When you wait some time, and you’re sure that nodes are excluded from Load Balancer—you can delete them.\
 How to know depends on your LB configuration.
 But if you know your Load Balancer `idle connection timeout` - wait at least few sec more than that value.
 After that, drop Node Group.
 \
-EKS will evict Node Group and will respect `terminationGracePeriodSeconds` of your pods deployments.
+EKS will evict Node Group and will respect `terminationGracePeriodSeconds` of your pod deployments.
 
 ### 6. Descaling Deployments
 
-And right after delete Node Group - descale your Deployments.\
-Often I saw when people recommend first descaling and delete Node Group after.\, 
-But I encounter strange behavior which I didn't expected.\
-When descaling by scale of 2 as example -
-kubernetes (at least versions <= 1.27, but I'm pretty sure it's actual in 1.30)
+And right after delete Node Group—descale your Deployments.\
+Often I saw when people recommend first descaling and delete Node Group after.\  
+But I encounter strange behavior which I didn’t expect - \
+When descaling by scale of 2 as example—kubernetes (at least versions <= 1.27, but I’m pretty sure it’s actual in 1.30)
 may descale pods from old and new Node Group randomly.
 Even if Node Group marked as `No Schedule`.\
 Not good, approach "Delete and descale after" also risky—you would have better to do it fast.
-Don't wait after deletion Node Group.\
-Who knows what happens?\
-When you delete first - EKS won't descale pods from the new Node Group.
+Don’t wait after deletion Node Group. \
+Who knows what happens? \
+When you delete first - EKS won’t descale pods from the new Node Group.
 It will drop already draining pods from the old one.\ 
 Another drawback—it might schedule them in a new Node Group before you descale.\
 So think what approach suits for you.
 
 #### 6.1 Descale user deployments
 
-Let's pretend that you do as I said above.\
+Let’s pretend that you do as I said above.\
 Descale your deployments to the initial state.
 
 #### 6.2 Descale service deployments
@@ -193,14 +199,14 @@ Untag deployments—remove annotations that you put in them in [previous steps](
 
 #### 6.4 Unfroze Pod Autoscaler
 
-Restore state of Pod Autoscaler.
+Restore the state of Pod Autoscaler.
 
 #### 6.5 Unfroze Node Autoscaler
 
-And restore state of Node Autoscaler.
+And restore the state of Node Autoscaler.
 
 ### Summary
 
-It's all.\
+It’s all.\
 I hope this helps someone.
-Despite there a lot of tutorials in web.
+Despite there are a lot of tutorials on the web.
