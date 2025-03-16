@@ -1,3 +1,10 @@
+title: jekyllBear
+description: a minimal, text focused blog theme
+# baseurl: "/jekyllBear" # the subpath of your site, e.g. /blog/
+url: "https://knhash.in/jekyllBear" # the base hostname & protocol for your site
+# host: 0.0.0.0
+
+
 plugins:
   - jekyll-redirect-from
 
