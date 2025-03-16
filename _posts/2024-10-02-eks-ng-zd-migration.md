@@ -1,6 +1,7 @@
 ---
 title: AWS EKS zero-downtime Node Group migration
 author: kirka
+layout: post
 date: 2024-10-02 21:10:00 +0800
 categories: [Software, Tutorial]
 tags: [cloud, eks]
