@@ -36,7 +36,8 @@ defaults:
     values:
       layout: tagged
 
-baseurl: "https://kir-push.github.io/"
+url: "https://kir-push.github.io/"
+baseurl: ""
 permalink: /blog/:slug
 timezone: America/New_York
 future: false
