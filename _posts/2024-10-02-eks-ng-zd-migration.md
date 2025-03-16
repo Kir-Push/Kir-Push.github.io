@@ -12,10 +12,12 @@ Once I worked on a service that allows customers to deploy their profiles
 (configuration for company healthcare server) in the cloud.
 \
 Clients created environment and will be able to configure number `instances`, their `RAM`, `CPU` and so on.\
-In backend actually every environment was a `EKS` cluster with `ingress`, `node/pod autoscaler`, `calico` and other fancy things.\
+In backend actually every environment was a `EKS` cluster with `ingress`, `node/pod autoscaler`, `calico` and other
+fancy things.\
 And as clients may rescale their environment at runtime (and of course they don’t want to know what is behind that), we
 should be able to resize cluster flawlessly.\
-Therefore, I had a task to automate migration all deployments to different `Node Group` without downtime and packet drops.
+Therefore, I had a task to automate migration all deployments to different `Node Group` without downtime and packet
+drops.
 
 > Service was in `Java/Spring`, so `Java AWS SDK V2` was used (but it doesn’t matter).
 > {: .prompt-tip }
@@ -29,7 +31,8 @@ Why? \
 We from our service can’t control what actually was deployed. We can't tell deployed profile `close your connection`. We
 still can stop profile (and pod) of course. \
 And we can’t control `Load Balancer` either (we used `Network Load Balancer`). \
-So the main strategy for "No packed drops" for deployment configuration is big `termination grace period`. Bigger than any open connection can last for a specific pod.
+So the main strategy for "No packed drops" for deployment configuration is big `termination grace period`. Bigger than
+any open connection can last for a specific pod.
 
 ## Steps
 
@@ -67,7 +70,9 @@ At first, we need to create new `Node Group` - the one we will migrate to:
         try {
             var nodegroup = eksClient.createNodegroup(request);
 ```
+
 and code for Launch Template (`ec2Service.createLaunchTemplate`):
+
 ```java
             var request = CreateLaunchTemplateRequest
                     .builder()
@@ -97,8 +102,8 @@ and code for Launch Template (`ec2Service.createLaunchTemplate`):
 > Probably it was fixed already.
 > {: .prompt-warning }
 
-For manual creation using CLI, you can refer [to AWS docs](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html).
-
+For manual creation using CLI, you can
+refer [to AWS docs](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html).
 
 ### 2. Tagging the old Node Group
 
@@ -106,8 +111,8 @@ For manual creation using CLI, you can refer [to AWS docs](https://docs.aws.amaz
 
 The next step is tagging your existing Node Group for stopping scheduling new pods on this group.\
 Kubernetes has special taint (mark for nodes) for that - `No Schedule`.\
-You can read about taints in kubernetes [docs](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
-
+You can read about taints in
+kubernetes [docs](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
 
 #### 2.2 Froze Node Autoscaler
 
@@ -136,7 +141,6 @@ Will be handily on at the end of migration.
 
 If you have Pod Autoscaler—do the same as you do with [Node Autoscaler](#22-froze-node-autoscaler).
 
-
 #### 3.3 Scale service deployments
 
 Next I would recommend scaling your service deployments(coreDns, Autoscaler),\
@@ -155,10 +159,10 @@ Kubernetes has a label for that - `http://node.kubernetes.io/exclude-from-extern
 Refer to [docs](https://kubernetes.io/docs/reference/labels-annotations-taints/) as usual.
 
 > Please note - if your LB service `externalTrafficPolicy` property set to `local` - you’re fine.\
-> But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worth doing).
+> But if your property is `cluster` - excluding from Load Balancer won't give you that effect (Still may be worth
+> doing).
 > {: .prompt-warning }
 
- 
 ### 5. Deleting the old Node Group
 
 When you wait some time, and you’re sure that nodes are excluded from Load Balancer—you can delete them.\
@@ -180,7 +184,7 @@ Not good, approach "Delete and descale after" also risky—you would have better
 Don’t wait after deletion Node Group. \
 Who knows what happens? \
 When you delete first - EKS won’t descale pods from the new Node Group.
-It will drop already draining pods from the old one.\ 
+It will drop already draining pods from the old one.\
 Another drawback—it might schedule them in a new Node Group before you descale.\
 So think what approach suits for you.
 
