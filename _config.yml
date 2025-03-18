@@ -29,12 +29,12 @@ collections:
     output: true
     permalink: /tagged/:slug/
 defaults:
-  - 
-  scope:
-    path: ""
-    type: my_tags
-  values:
-    layout: tagged
+  -
+    scope:
+      path: ""
+      type: my_tags
+    values:
+      layout: tagged
 
 url: "https://kir-push.github.io"
 baseurl: ""
